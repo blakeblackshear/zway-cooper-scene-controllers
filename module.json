@@ -1,0 +1,21 @@
+{
+	"singleton": false,
+	"dependencies": [],
+	"category": "automation",
+	"author": "Blake Blackshear",
+	"homepage": "https://github.com/blakeblackshear/zway-cooper-scene-controllers",
+	"icon": "",
+	"version": "1.0.0",
+	"maturity": "stable",
+	"repository": {
+		"type": "git",
+		"source": "https://github.com/blakeblackshear/zway-cooper-scene-controllers"
+	},
+	"defaults": {
+                "title": "Cooper Scene Controllers",
+                "description": "Sync Cooper Scene Controller button status with indicators",
+                "sourceDevices": []
+	},
+	"schema": {},
+	"options": {}
+}
