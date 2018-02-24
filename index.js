@@ -84,11 +84,13 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
     var self = this;
     var nodeId = this.getDeviceIndex(device.id);
     if ( global.ZWave && !isNaN(nodeId) ) {
-        var fetchIndicator = function(device) {
+        var syncIndicator = function(device) {
+            var buttonNum = self.getButtonNum("zway", device.id);
+            self.setIndicator(nodeId, buttonNum, device.get("metrics:level"));
             zway.devices[nodeId].Indicator.Get();
         }
-        this.controller.devices.on(device.id + ":change:metrics:level", fetchIndicator);
-        this.binderMethods.push({ event: device.id + ":change:metrics:level", func: fetchIndicator});
+        this.controller.devices.on(device.id + ":change:metrics:level", syncIndicator);
+        this.binderMethods.push({ event: device.id + ":change:metrics:level", func: syncIndicator});
 
         var updateButtonsCallback = function() {
             //self.log(JSON.stringify(this));
@@ -135,6 +137,13 @@ CooperSceneControllers.prototype.getVDevId = function(controllerName, nodeId, bu
     return ["ZWayVDev", controllerName, "Remote", deviceData.join("-")].join("_");
 };
 
+// Calculates the button for the virtual device id
+// Assumes Group1->Scene1, Group2->Scene2, ...
+// ZWayVDev_zway_Remote_14-0-0-2-S
+CooperSceneControllers.prototype.getButtonNum = function(controllerName, vDevId) {
+    return new RegExp('ZWayVDev_zway_Remote_\\d+-0-0-(\\d)-S', 'g').exec(vDevId)[1];
+};
+
 // Turn off virtual button if indicator is off
 CooperSceneControllers.prototype.updateButtons = function(nodeId, indicatorValue) {
     if(!(indicatorValue & 1)){
@@ -171,6 +180,29 @@ CooperSceneControllers.prototype.updateButtons = function(nodeId, indicatorValue
         if(buttonDev && buttonDev.get("metrics:level") != "off"){
             buttonDev.set("metrics:level", "off");
         }
+    }
+};
+
+CooperSceneControllers.prototype.setIndicator = function(nodeId, buttonNum, value) {
+    var currentIndicatorValue = zway.devices[nodeId].Indicator.data.stat.value;
+
+    var buttonBitwiseValues = {
+        "1": 1,
+        "2": 2,
+        "3": 4,
+        "4": 8,
+        "5": 16
+    };
+
+    var buttonBitwise = buttonBitwiseValues[buttonNum];
+
+    // if button is on and turning off
+    if(currentIndicatorValue & buttonBitwise && value == "off"){
+        zway.devices[nodeId].Indicator.Set(currentIndicatorValue - buttonBitwise);
+    }
+    // else if button is off and turning on
+    else if(!(currentIndicatorValue & buttonBitwise) && value == "on"){
+        zway.devices[nodeId].Indicator.Set(currentIndicatorValue + buttonBitwise)
     }
 };
 
