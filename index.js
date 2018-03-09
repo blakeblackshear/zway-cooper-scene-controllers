@@ -103,7 +103,10 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
         };
 
         if(!(nodeId in self.cooperControllers)){
-            self.cooperControllers[nodeId] = {indicatorUpdateTime: 0};
+            self.cooperControllers[nodeId] = {
+                indicatorUpdateTime: 0,
+                desiredIndicatorValue: zway.devices[nodeId].Indicator.data.stat.value
+            };
         }
 
         if(!(nodeId in self.indicatorBindings)){
@@ -184,7 +187,7 @@ CooperSceneControllers.prototype.updateButtons = function(nodeId, indicatorValue
 };
 
 CooperSceneControllers.prototype.setIndicator = function(nodeId, buttonNum, value) {
-    var currentIndicatorValue = zway.devices[nodeId].Indicator.data.stat.value;
+    var currentIndicatorValue = this.cooperControllers[nodeId].desiredIndicatorValue;
 
     var buttonBitwiseValues = {
         "1": 1,
@@ -198,12 +201,15 @@ CooperSceneControllers.prototype.setIndicator = function(nodeId, buttonNum, valu
 
     // if button is on and turning off
     if(currentIndicatorValue & buttonBitwise && value == "off"){
-        zway.devices[nodeId].Indicator.Set(currentIndicatorValue - buttonBitwise);
+        currentIndicatorValue = currentIndicatorValue - buttonBitwise;
     }
     // else if button is off and turning on
     else if(!(currentIndicatorValue & buttonBitwise) && value == "on"){
-        zway.devices[nodeId].Indicator.Set(currentIndicatorValue + buttonBitwise)
+        currentIndicatorValue = currentIndicatorValue + buttonBitwise;
     }
+
+    this.cooperControllers[nodeId].desiredIndicatorValue = currentIndicatorValue;
+    zway.devices[nodeId].Indicator.Set(currentIndicatorValue);
 };
 
 CooperSceneControllers.prototype.isCooperController = function(device) {
