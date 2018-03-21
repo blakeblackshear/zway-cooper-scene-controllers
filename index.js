@@ -85,9 +85,16 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
     var nodeId = this.getDeviceIndex(device.id);
     if ( global.ZWave && !isNaN(nodeId) ) {
         var syncIndicator = function(device) {
-            var buttonNum = self.getButtonNum("zway", device.id);
-            self.setIndicator(nodeId, buttonNum, device.get("metrics:level"));
-            zway.devices[nodeId].Indicator.Get();
+            // when the event is tied to an actual button, set the indicator
+            if (device.get("deviceType") === "toggleButton"){
+                self.log("CooperSceneControllers: Toggle Button " + device.id + " set to " + device.get("metrics:level"));
+                var buttonNum = self.getButtonNum("zway", device.id);
+                self.setIndicator(nodeId, buttonNum, device.get("metrics:level"));
+            // else if the event is the generic off message, update the indicator
+            } else if(device.get("deviceType") === "switchControl"){
+                self.log("CooperSceneControllers: Switch Control " + device.id + " set to " + device.get("metrics:level"));
+                zway.devices[nodeId].Indicator.Get();
+            }
         }
         this.controller.devices.on(device.id + ":change:metrics:level", syncIndicator);
         this.binderMethods.push({ event: device.id + ":change:metrics:level", func: syncIndicator});
