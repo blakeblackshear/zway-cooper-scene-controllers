@@ -87,12 +87,12 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
         var syncIndicator = function(device) {
             // when the event is tied to an actual button, set the indicator
             if (device.get("deviceType") === "toggleButton"){
-                self.log("CooperSceneControllers: Toggle Button " + device.id + " set to " + device.get("metrics:level"));
                 var buttonNum = self.getButtonNum("zway", device.id);
                 self.setIndicator(nodeId, buttonNum, device.get("metrics:level"));
+                // fetch the values for any associated lights
+                _.delay(_.bind(self.queryAssociatedDevices, self), 2000, nodeId, buttonNum);
             // else if the event is the generic off message, update the indicator
             } else if(device.get("deviceType") === "switchControl"){
-                self.log("CooperSceneControllers: Switch Control " + device.id + " set to " + device.get("metrics:level"));
                 zway.devices[nodeId].Indicator.Get();
             }
         }
@@ -110,10 +110,17 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
         };
 
         if(!(nodeId in self.cooperControllers)){
-            self.cooperControllers[nodeId] = {
+            var sceneController = {
                 indicatorUpdateTime: 0,
-                desiredIndicatorValue: zway.devices[nodeId].Indicator.data.stat.value
+                desiredIndicatorValue: zway.devices[nodeId].Indicator.data.stat.value,
+                associations: {1: [], 2: [], 3: [], 4: [], 5: []}
             };
+
+            for (var i = 1; i < 6; i++){
+                sceneController.associations[i] = _.without(zway.devices[nodeId].Association.data[i].nodes.value, 1);
+            }
+
+            self.cooperControllers[nodeId] = sceneController;
         }
 
         if(!(nodeId in self.indicatorBindings)){
@@ -217,6 +224,21 @@ CooperSceneControllers.prototype.setIndicator = function(nodeId, buttonNum, valu
 
     this.cooperControllers[nodeId].desiredIndicatorValue = currentIndicatorValue;
     zway.devices[nodeId].Indicator.Set(currentIndicatorValue);
+};
+
+CooperSceneControllers.prototype.queryAssociatedDevices = function(nodeId, buttonNum) {
+    var self = this
+
+    var associations = self.cooperControllers[nodeId].associations[buttonNum];
+
+    self.controller.devices.each(function(device) {
+        var deviceIndex = self.getDeviceIndex(device.id);
+        if(_.contains(associations, parseInt(deviceIndex))) {
+            if(device.get('deviceType') === 'switchMultilevel') {
+                zway.devices[deviceIndex].instances[0].commandClasses[38].Get();
+            }
+        }
+    });
 };
 
 CooperSceneControllers.prototype.isCooperController = function(device) {
