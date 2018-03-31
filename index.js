@@ -34,6 +34,7 @@ CooperSceneControllers.prototype.init = function (config) {
     CooperSceneControllers.super_.prototype.init.call(this, config);
 
     var self = this;
+
     self.indicatorBindings = {};
     self.binderMethods = [];
     self.cooperControllers = {};
@@ -109,6 +110,48 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
             }
         };
 
+        var syncButtonsToDevices = function(device) {
+            var nodeId = self.getDeviceIndex(device.id);
+            // self.log("Sync triggered: "+nodeId);
+            // loop over all controllers
+            for (var controllerId in self.cooperControllers) {
+                // self.log("Checking controller: "+controllerId);
+                // loop over all association groups
+                for (var groupId in self.cooperControllers[controllerId].associations) {
+                    // self.log("Checking button: "+groupId);
+                    // if the node id of the device is in the list
+                    // self.log(JSON.stringify(self.cooperControllers[controllerId].associations[groupId]));
+                    if (_.contains(self.cooperControllers[controllerId].associations[groupId], parseInt(nodeId))) {
+                        // find the first node in the list that is on
+                        var firstNodeOn = _.find(self.cooperControllers[controllerId].associations[groupId], function(associatedNodeId){
+                            return zway.devices[associatedNodeId].instances[0].commandClasses[38].data.level.value > 0;
+                        });
+
+                        // fetch the virtual device for the associated button
+                        var vDevId = self.getVDevId("zway", controllerId, groupId);
+                        var buttonDev = self.controller.devices.get(vDevId);
+                        
+                        // if no devices were on
+                        if (_.isUndefined(firstNodeOn)) {
+                            // self.log("No devices on");
+                            // and if the button is not off
+                            if(buttonDev && buttonDev.get("metrics:level") != "off"){
+                                buttonDev.set("metrics:level", "off");
+                            }
+                        }
+                        // else if at least 1 device was on
+                        else {
+                            // self.log("At least one device is on");
+                            // and if the button is not already on
+                            if(buttonDev && buttonDev.get("metrics:level") != "on"){
+                                buttonDev.set("metrics:level", "on");
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
         if(!(nodeId in self.cooperControllers)){
             var sceneController = {
                 indicatorUpdateTime: 0,
@@ -117,7 +160,13 @@ CooperSceneControllers.prototype.fixCooperDevice = function(device) {
             };
 
             for (var i = 1; i < 6; i++){
-                sceneController.associations[i] = _.without(zway.devices[nodeId].Association.data[i].nodes.value, 1);
+                var associations = _.without(zway.devices[nodeId].Association.data[i].nodes.value, 1);
+                // bind to the change events for associated devices
+                _.each(associations, function(associatedDeviceId){
+                    var vDevId = "ZWayVDev_zway_" + associatedDeviceId + "-0-38";
+                    self.controller.devices.on(vDevId + ":change:metrics:level", syncButtonsToDevices);
+                });
+                sceneController.associations[i] = associations;
             }
 
             self.cooperControllers[nodeId] = sceneController;
